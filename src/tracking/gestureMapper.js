@@ -138,6 +138,7 @@ export class GestureMapper {
     this.lastTime = null;
     this.lastMeasureTime = null;
     this.galaxyScale = 1;
+    this.suppress = 0;
 
     this._ndc = new THREE.Vector3();
     this._dir = new THREE.Vector3();
@@ -157,9 +158,16 @@ export class GestureMapper {
   }
 
   // hands: salida de HandTracker.detect(). timeMs: tiempo de requestAnimationFrame.
-  update(hands, timeMs) {
+  // suppress (0–1): cuánto se parecen las manos a un gesto especial de dos manos.
+  //   Mientras dura, los efectos de cada mano se atenúan, la escala de dos manos se
+  //   congela y el gesto se marca 'corazón' (así al soltar no salta la onda expansiva).
+  //   Con 0 (por defecto) el comportamiento es exactamente el de siempre.
+  update(hands, timeMs, { suppress = 0 } = {}) {
     const dt = this.lastTime === null ? 1 / 60 : clamp((timeMs - this.lastTime) / 1000, 1e-3, 0.1);
     this.lastTime = timeMs;
+    // Entra rápido y se libera despacio, para no soltar efectos a mitad del gesto.
+    this.suppress = approach(this.suppress, clamp(suppress, 0, 1), suppress > this.suppress ? 15 : 3, dt);
+    const keep = 1 - this.suppress;
 
     // Solo hay medidas nuevas cuando la cámara entregó otro fotograma.
     if (hands !== this.lastHands) {
@@ -183,18 +191,21 @@ export class GestureMapper {
       s.tick(dt);
       this.#project(s);
       const out = this.params.hands[i];
-      out.presence = s.presence;
+      out.presence = s.presence * keep;
       out.openness = s.openness;
       out.pinch = s.pinch;
-      out.gesture = s.gesture;
-      pinchMax = Math.max(pinchMax, s.pinch * s.presence);
+      out.gesture = this.suppress > 0.5 ? 'corazón' : s.gesture;
+      pinchMax = Math.max(pinchMax, s.pinch * s.presence * keep);
       anyPresent ||= s.presence > 0.5;
     });
 
     // Dos manos: la distancia entre ellas (relativa al alto visible) escala la galaxia.
+    // Durante un gesto especial la escala se queda como estaba.
     const [a, b] = this.slots;
     let targetScale = 1;
-    if (a.presence > 0.5 && b.presence > 0.5) {
+    if (this.suppress > 0.3) {
+      targetScale = this.galaxyScale;
+    } else if (a.presence > 0.5 && b.presence > 0.5) {
       const spread = a.position.distanceTo(b.position) / this.#viewHeightAtTarget();
       targetScale = THREE.MathUtils.mapLinear(clamp(spread, 0.2, 1.3), 0.2, 1.3, 0.55, 1.8);
     }

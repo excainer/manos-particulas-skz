@@ -21,9 +21,19 @@
 //   - dos manos:       la distancia entre ellas escala la galaxia
 
 import * as THREE from 'three';
+import { buildHeartTargets } from './heartShape.js';
 
 const INTRO_SECONDS = 3.0;
 const WAVE_SECONDS = 2.0;
+
+// Secuencia especial (activación única): parte de la galaxia viaja hasta formar un
+// corazón 3D que late en el centro de la pantalla y luego regresa.
+//   0 – 2,5 s formación escalonada · latido · últimos 2 s regreso
+// La duración total la fija quien la lanza (p. ej. la de la canción); por defecto 10 s.
+export const DEFAULT_HEART_SECONDS = 10.0;
+const HEART_RETURN_SECONDS = 2.0; // el regreso empieza 2 s antes del final
+const HEART_SHARE = 0.38; //     fracción de partículas de la galaxia que forman el corazón
+const HEART_BEAT_PERIOD = 0.85; // s por latido (~70 pulsaciones por minuto)
 
 const ROTATE_GLSL = /* glsl */ `
   // Rotación de v alrededor del eje unitario k (fórmula de Rodrigues).
@@ -48,9 +58,23 @@ const vertexShader = /* glsl */ `
   uniform vec4 uWave[2];      // origen de la onda expansiva (local) y su edad en s (<0 = inactiva)
   uniform vec3 uSwirlAxis;    // eje del remolino (dirección de la cámara, en local)
 
+  // Corazón (en coordenadas del mundo).
+  uniform float uHeartTime;   // segundos desde la activación (<0 = inactivo)
+  uniform float uHeartLeaveAt; // segundo en que empieza el regreso a la galaxia
+  uniform float uHeartShare;  // fracción de esta capa que forma el corazón (0 = ninguna)
+  uniform float uHeartBeat;   // latido 0–1
+  uniform float uHeartDim;    // atenuación del resto de la galaxia 0–1
+  uniform float uHeartScale;
+  uniform float uHeartSway;   // giro suave alrededor del eje vertical del corazón
+  uniform vec3 uHeartCenter;
+  uniform vec3 uHeartRight;   // ejes de la cámara: el corazón siempre la mira de frente
+  uniform vec3 uHeartUp;
+  uniform vec3 uHeartFwd;     // hacia la cámara
+
   attribute vec3 aColor;
   attribute float aSize;
   attribute float aSeed;
+  attribute vec3 aHeart;      // destino en el corazón (solo la galaxia lo tiene)
 
   varying vec3 vColor;
   varying float vAlpha;
@@ -115,11 +139,38 @@ const vertexShader = /* glsl */ `
       }
     }
 
-    vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
+    vec4 world = modelMatrix * vec4(p, 1.0);
+
+    // Corazón: las partículas elegidas viajan desde su sitio en la galaxia (ya con
+    // las fuerzas de las manos aplicadas) hasta su punto del corazón, y luego vuelven.
+    float heart = 0.0;
+    float heartPick = 0.0;
+    float heartInside = 0.0; // 1 = partícula de la galaxia dentro del corazón (se aparta)
+    if (uHeartTime >= 0.0 && uHeartShare > 0.0) {
+      heartPick = step(fract(aSeed * 13.73), uHeartShare);
+      heartInside = 1.0 - smoothstep(0.7, 1.6, length(world.xyz - uHeartCenter) / uHeartScale);
+      float arrive = smoothstep(0.0, 1.0, clamp((uHeartTime - fract(aSeed * 7.31)) / 1.5, 0.0, 1.0));
+      float leave = smoothstep(0.0, 1.0,
+        clamp((uHeartTime - uHeartLeaveAt - fract(aSeed * 3.17) * 0.6) / 1.4, 0.0, 1.0));
+      heart = heartPick * arrive * (1.0 - leave);
+      if (heart > 0.0) {
+        float c = cos(uHeartSway);
+        float s = sin(uHeartSway);
+        vec3 h = vec3(aHeart.x * c + aHeart.z * s, aHeart.y, -aHeart.x * s + aHeart.z * c);
+        float size = uHeartScale * (1.0 + 0.07 * uHeartBeat);
+        vec3 target = uHeartCenter + (uHeartRight * h.x + uHeartUp * h.y + uHeartFwd * h.z) * size;
+        target += uHeartFwd * sin(uTime * 1.7 + aSeed * 40.0) * 0.02 * uHeartScale; // vibración viva
+        world.xyz = mix(world.xyz, target, heart)
+          + uHeartFwd * sin(heart * 3.14159) * 0.6 * uHeartScale; // el viaje traza un arco hacia la cámara
+      }
+    }
+
+    vec4 mvPosition = viewMatrix * world;
     gl_Position = projectionMatrix * mvPosition;
 
     float depth = -mvPosition.z;
-    gl_PointSize = min(uSize * aSize * (1.0 + boost * 1.5) * uPixelRatio / depth, 256.0 * uPixelRatio);
+    gl_PointSize = min(uSize * aSize * (1.0 + boost * 1.5) * mix(1.0, 0.85, heart) * uPixelRatio / depth,
+                       256.0 * uPixelRatio);
 
     // Parpadeo + desvanecer partículas pegadas a la cámara (evita manchas gigantes).
     float twinkle = 1.0 - uTwinkle * (0.35 - 0.35 * sin(uTime * (0.8 + aSeed * 2.5) + aSeed * 50.0));
@@ -129,7 +180,18 @@ const vertexShader = /* glsl */ `
     // (así la nebulosa, que es muy tenue, no se convierte en manchas blancas).
     float lum = max(aColor.r, max(aColor.g, aColor.b));
     vColor = mix(aColor, vec3(0.75, 1.0, 1.0) * lum, boost * 0.7) * (1.0 + boost * 0.5);
-    vAlpha = twinkle * nearFade * intro;
+
+    // Tonos rosa y rojo para el corazón; el latido los aviva.
+    if (heart > 0.0) {
+      vec3 rose = mix(vec3(1.0, 0.16, 0.36), vec3(1.0, 0.55, 0.72), fract(aSeed * 5.11));
+      float b = (0.65 + 0.65 * fract(aSeed * 3.31)) * (1.0 + 0.6 * uHeartBeat);
+      vColor = mix(vColor, rose * b, heart);
+    }
+
+    // El resto de la galaxia se atenúa un poco para que el corazón destaque, y casi del todo
+    // dentro del corazón (el núcleo brillante de la galaxia no debe taparlo).
+    float galaxyDim = clamp(1.0 - uHeartDim * (0.35 + 0.6 * heartInside), 0.0, 1.0);
+    vAlpha = twinkle * nearFade * intro * mix(galaxyDim, 1.0, heartPick);
   }
 `;
 
@@ -204,6 +266,7 @@ const GESTURE_COLORS = {
   puño: new THREE.Color('#ff6fae'),
   pellizco: new THREE.Color('#ffffff'),
   neutra: new THREE.Color('#b48cff'),
+  corazón: new THREE.Color('#ff4f86'),
 };
 
 const AURA_PER_HAND = 220;
@@ -328,6 +391,24 @@ export class ParticleSystem {
     this.intro = { value: 0 };
     this.pixelRatio = { value: 1 };
     this.handState = { value: [new THREE.Vector4(), new THREE.Vector4()] };
+    this.heartUniforms = {
+      uHeartTime: { value: -1 },
+      uHeartLeaveAt: { value: DEFAULT_HEART_SECONDS - HEART_RETURN_SECONDS },
+      uHeartBeat: { value: 0 },
+      uHeartDim: { value: 0 },
+      uHeartScale: { value: 5 },
+      uHeartSway: { value: 0 },
+      uHeartCenter: { value: new THREE.Vector3() },
+      uHeartRight: { value: new THREE.Vector3(1, 0, 0) },
+      uHeartUp: { value: new THREE.Vector3(0, 1, 0) },
+      uHeartFwd: { value: new THREE.Vector3(0, 0, 1) },
+    };
+    this.heartCenter = new THREE.Vector3(); // centro de la pantalla (punto al que mira la cámara)
+    this.heartStart = null;
+    this.heartFreeze = null;
+    this.heartDuration = DEFAULT_HEART_SECONDS;
+    this.heartElapsed = -1;
+    this.heartAmount = 0;
 
     this.spinRate = 1;
     this.swirlPhase = [0, 0];
@@ -347,6 +428,10 @@ export class ParticleSystem {
     this.cursor = this.#createLayer(buildCursors(), { size: 700, spin: 0, core: 1, twinkle: 0.3 });
     this.aura = this.#createAura();
     this.handLayers = [this.galaxy, this.nebula];
+
+    // Solo la galaxia forma el corazón: cada partícula recibe su punto de destino.
+    this.galaxy.geometry.setAttribute('aHeart', new THREE.BufferAttribute(buildHeartTargets(count), 3));
+    this.galaxy.material.uniforms.uHeartShare.value = HEART_SHARE;
   }
 
   #createLayer({ positions, colors, sizes, seeds }, { size, spin, core, influence = 0, twinkle = 1 }) {
@@ -374,6 +459,8 @@ export class ParticleSystem {
         uHandPos: { value: [new THREE.Vector3(), new THREE.Vector3()] },
         uWave: { value: [new THREE.Vector4(0, 0, 0, -1), new THREE.Vector4(0, 0, 0, -1)] },
         uSwirlAxis: { value: new THREE.Vector3(0, 0, 1) },
+        uHeartShare: { value: 0 },
+        ...this.heartUniforms,
       },
       ...sharedLayerOptions,
     });
@@ -427,9 +514,37 @@ export class ParticleSystem {
     this.pixelRatio.value = pr;
   }
 
-  // Brillo extra sugerido para el bloom (pellizco + destello de las ondas).
+  // Brillo extra sugerido para el bloom (pellizco + destello de las ondas + latido).
   getBloomBoost() {
     return this.bloomBoost;
+  }
+
+  // Lanza la secuencia del corazón (activación única: si ya está en curso, se ignora).
+  // duration: segundos totales (p. ej. la duración de la canción); mínimo 6 s.
+  // freezeAt (solo desarrollo): congela la secuencia en ese segundo.
+  playHeart(timeMs, { duration = DEFAULT_HEART_SECONDS, freezeAt = null } = {}) {
+    if (this.heartStart !== null) return false;
+    this.heartStart = timeMs / 1000;
+    this.heartFreeze = freezeAt;
+    this.heartDuration = Math.max(6, Number.isFinite(duration) ? duration : DEFAULT_HEART_SECONDS);
+    this.heartUniforms.uHeartLeaveAt.value = this.heartDuration - HEART_RETURN_SECONDS;
+    return true;
+  }
+
+  // Cambia la duración de la secuencia en curso (p. ej. si la música no llega a sonar).
+  setHeartDuration(duration) {
+    if (this.heartStart === null) return;
+    this.heartDuration = Math.max(6, Number.isFinite(duration) ? duration : DEFAULT_HEART_SECONDS);
+    this.heartUniforms.uHeartLeaveAt.value = this.heartDuration - HEART_RETURN_SECONDS;
+  }
+
+  get heartPlaying() {
+    return this.heartStart !== null;
+  }
+
+  // Centro del corazón: el punto al que mira la cámara (centro de la pantalla).
+  setHeartCenter(v) {
+    this.heartCenter = v;
   }
 
   // params: salida de GestureMapper.update() (opcional). camera: para orientar el remolino.
@@ -454,11 +569,56 @@ export class ParticleSystem {
     const hands = params.hands ?? [];
     this.#updateWaves(hands, dt);
     this.#updateHands(hands, dt, camera);
+    this.#updateHeart(t, camera);
 
-    // Bloom: sube con el pellizco y destella al nacer cada onda.
+    // Bloom: sube con el pellizco, destella al nacer cada onda y palpita con el corazón.
     let flash = 0;
     for (const age of this.waveAge) if (age >= 0) flash = Math.max(flash, 1 - age / 0.5);
-    this.bloomBoost = approach(this.bloomBoost, 0.12 * pinchMax + 0.6 * Math.max(flash, 0), 10, dt);
+    const heartGlow = 0.2 * this.heartUniforms.uHeartBeat.value;
+    this.bloomBoost = approach(this.bloomBoost, 0.12 * pinchMax + 0.6 * Math.max(flash, 0) + heartGlow, 10, dt);
+  }
+
+  #updateHeart(t, camera) {
+    const u = this.heartUniforms;
+    // Si el inicio se registró con un reloj algo adelantado respecto al de los fotogramas,
+    // el tiempo transcurrido puede salir ligeramente negativo: eso es "recién empezado",
+    // nunca "terminado".
+    const elapsed = this.heartStart === null ? -1 : (this.heartFreeze ?? Math.max(0, t - this.heartStart));
+    const duration = this.heartDuration;
+    const leaveAt = duration - HEART_RETURN_SECONDS;
+    this.heartElapsed = elapsed <= duration ? elapsed : -1;
+    if (elapsed < 0 || elapsed > duration) {
+      this.heartStart = null;
+      this.heartAmount = 0;
+      u.uHeartTime.value = -1;
+      u.uHeartBeat.value = 0;
+      u.uHeartDim.value = 0;
+      return;
+    }
+    const smooth = THREE.MathUtils.smoothstep;
+    u.uHeartTime.value = elapsed;
+
+    // Presencia global del corazón (para atenuar el resto de la galaxia).
+    this.heartAmount = smooth(elapsed, 0, 2.5) * (1 - smooth(elapsed, leaveAt, duration));
+    u.uHeartDim.value = this.heartAmount;
+
+    // Latido doble ("lub-dub"), solo cuando el corazón ya está formado.
+    const beatEnvelope = smooth(elapsed, 1.5, 2.5) * (1 - smooth(elapsed, leaveAt - 0.5, leaveAt + 0.5));
+    const ph = (elapsed % HEART_BEAT_PERIOD) / HEART_BEAT_PERIOD;
+    const pulse = Math.exp(-(((ph - 0.06) / 0.05) ** 2)) + 0.55 * Math.exp(-(((ph - 0.3) / 0.06) ** 2));
+    u.uHeartBeat.value = pulse * beatEnvelope;
+    u.uHeartSway.value = 0.35 * Math.sin(elapsed * 0.9);
+
+    // Centrado en pantalla, de frente a la cámara y con un tamaño que quepa en cualquier proporción.
+    u.uHeartCenter.value.copy(this.heartCenter);
+    if (camera) {
+      u.uHeartRight.value.set(1, 0, 0).applyQuaternion(camera.quaternion);
+      u.uHeartUp.value.set(0, 1, 0).applyQuaternion(camera.quaternion);
+      u.uHeartFwd.value.set(0, 0, 1).applyQuaternion(camera.quaternion);
+      const d = camera.position.distanceTo(this.heartCenter);
+      const viewH = 2 * d * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+      u.uHeartScale.value = Math.min(viewH, viewH * camera.aspect) * 0.2;
+    }
   }
 
   // Dispara una onda expansiva cuando una mano pasa de puño a abierta.
