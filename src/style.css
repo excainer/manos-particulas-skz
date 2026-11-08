@@ -82,3 +82,26 @@ html, body {
 #estado {
   color: rgba(220, 226, 255, 0.6);
 }
+
+/* Leyenda de gestos, abajo a la izquierda */
+#ayuda {
+  position: fixed;
+  left: 16px;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  max-width: calc(100% - min(240px, 38vw) - 48px); /* no pisar la miniatura de la cámara */
+  margin: 0;
+  padding: 10px 14px;
+  list-style: none;
+  font-size: 12px;
+  line-height: 1.7;
+  color: rgba(220, 226, 255, 0.65);
+  background: rgba(20, 24, 45, 0.45);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(160, 180, 255, 0.15);
+  border-radius: 10px;
+  pointer-events: none;
+}
+#ayuda b { font-weight: 600; color: #e6e8ef; }
+#ayuda .g-puno { color: #ff6fae; }
+#ayuda .g-abierta { color: #7ef9ff; }
+#ayuda .g-pellizco { color: #ffffff; }

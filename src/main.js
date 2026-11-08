@@ -4,21 +4,32 @@
 //   (vídeo)    (21 puntos/mano)  (gestos → parámetros)  (Three.js)
 //                   │
 //                   └──► HandOverlay (esqueleto sobre la miniatura, depuración)
+//
+// Parámetros de URL para desarrollo:
+//   ?autostart              activa la cámara al cargar
+//   ?debug                  muestra los valores crudos de los gestos (para ajustar umbrales)
+//   ?demo=fist|open|pinch|two  manos simuladas, sin cámara
 
 import { createScene } from './scene/scene.js';
 import { ParticleSystem } from './scene/particles.js';
 import { HandTracker } from './tracking/handTracker.js';
 import { HandOverlay } from './tracking/handOverlay.js';
 import { GestureMapper } from './tracking/gestureMapper.js';
+import { createDemoHands } from './dev/demoHands.js';
 
 const canvas = document.getElementById('escena');
 const camara = document.getElementById('camara');
 const video = document.getElementById('webcam');
 const manosCanvas = document.getElementById('manos');
 const estado = document.getElementById('estado');
+const ayuda = document.getElementById('ayuda');
 const btnIniciar = document.getElementById('btn-iniciar');
 
-const { scene, render, onResize } = createScene(canvas);
+const urlParams = new URLSearchParams(location.search);
+const DEBUG = urlParams.has('debug');
+const demoHands = urlParams.has('demo') ? createDemoHands(urlParams.get('demo')) : null;
+
+const { scene, camera, controls, render, onResize } = createScene(canvas);
 
 // Menos partículas en pantallas pequeñas (móviles suelen tener GPU más modesta).
 const isSmallScreen = Math.min(window.innerWidth, window.innerHeight) < 700;
@@ -27,11 +38,11 @@ onResize((w, h, pr) => particles.setPixelRatio(pr));
 
 const tracker = new HandTracker(video);
 const overlay = new HandOverlay(manosCanvas, video);
-const mapper = new GestureMapper();
+const mapper = new GestureMapper(camera, { target: controls.target });
 
 const IDLE_TEXT = 'Arrastra para orbitar · rueda para acercar';
 estado.textContent = IDLE_TEXT;
-let lastHandCount = -1; // nº de manos mostrado en el estado (-1 = forzar actualización)
+let lastStatus = ''; // texto de estado mostrado (solo se toca el DOM si cambia)
 
 // Mensajes claros para los fallos habituales al pedir la cámara.
 function describeError(err) {
@@ -52,9 +63,11 @@ async function startCamera() {
   try {
     await tracker.start((msg) => (estado.textContent = msg));
     camara.hidden = false;
+    ayuda.hidden = false;
     overlay.syncSize();
+    mapper.setVideoAspect(video.videoWidth / video.videoHeight);
     btnIniciar.textContent = 'Detener cámara';
-    lastHandCount = -1; // fuerza a actualizar el texto de estado
+    lastStatus = ''; // fuerza a actualizar el texto de estado
   } catch (err) {
     console.error(err);
     tracker.stop();
@@ -68,6 +81,7 @@ function stopCamera() {
   tracker.stop();
   overlay.clear();
   camara.hidden = true;
+  ayuda.hidden = true;
   btnIniciar.textContent = 'Activar cámara';
   estado.textContent = IDLE_TEXT;
 }
@@ -78,27 +92,40 @@ btnIniciar.addEventListener('click', () => {
   else startCamera();
 });
 
-// Desarrollo: ?autostart activa la cámara al cargar (útil para pruebas automáticas).
-if (new URLSearchParams(location.search).has('autostart')) startCamera();
+if (urlParams.has('autostart')) startCamera();
 
-// El texto de estado solo se toca cuando cambia el número de manos (evita trabajo en el DOM).
-function updateHandStatus(hands) {
-  if (hands.length === lastHandCount) return;
-  lastHandCount = hands.length;
-  estado.textContent =
-    hands.length === 0
-      ? 'Cámara activa · muestra una mano'
-      : `${hands.length} ${hands.length === 1 ? 'mano detectada' : 'manos detectadas'}`;
+function updateStatus(params) {
+  let text;
+  if (DEBUG) {
+    text = mapper.debugText() || 'Cámara activa · muestra una mano';
+  } else {
+    const visibles = params.hands.filter((h) => h.presence > 0.5);
+    text =
+      visibles.length === 0
+        ? 'Cámara activa · muestra una mano'
+        : visibles.map((h) => (h.gesture === 'neutra' ? 'mano' : h.gesture)).join(' + ');
+  }
+  if (text !== lastStatus) estado.textContent = lastStatus = text;
 }
 
+let params = {};
 function loop(time) {
-  if (tracker.running) {
+  if (demoHands) {
+    params = demoHands(time);
+  } else if (tracker.running) {
     const hands = tracker.detect(time);
     overlay.draw(hands);
-    updateHandStatus(hands);
-    // TODO (paso 4): const params = mapper.update(hands);
+    params = mapper.update(hands, time);
+    updateStatus(params);
+  } else if (params.hands) {
+    // Cámara detenida: seguir actualizando para que los efectos se apaguen suavemente.
+    params = mapper.update([], time);
   }
-  particles.update(time /* , params */);
+
+  // Con una mano a la vista, la cámara deja de girar sola para que el control sea estable.
+  controls.autoRotate = !params.anyPresent;
+
+  particles.update(time, params, camera);
   render();
   requestAnimationFrame(loop);
 }
