@@ -1,6 +1,6 @@
 // Solo para desarrollo: genera parámetros de manos simuladas, con la misma forma
 // que devuelve GestureMapper, para probar los efectos sin cámara.
-//   ?demo=fist | open | pinch | two
+//   ?demo=fist | open | pinch | two | wave
 import * as THREE from 'three';
 
 const ramp = (t) => Math.min(1, t / 1.5); // aparece en 1,5 s
@@ -18,6 +18,11 @@ export function createDemoHands(kind) {
     if (kind === 'fist') Object.assign(a, { openness: 0, pinch: 0, gesture: 'puño' });
     if (kind === 'open') Object.assign(a, { openness: 1, pinch: 0, gesture: 'abierta' });
     if (kind === 'pinch') Object.assign(a, { openness: 0.8, pinch: 1, gesture: 'pellizco' });
+    // Puño durante 3,5 s y luego se abre → onda expansiva.
+    if (kind === 'wave') {
+      const open = t > 3.5;
+      Object.assign(a, { openness: open ? 1 : 0, pinch: 0, gesture: open ? 'abierta' : 'puño' });
+    }
     params.pinchMax = a.pinch * a.presence;
 
     if (kind === 'two') {

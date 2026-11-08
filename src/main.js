@@ -7,11 +7,12 @@
 //
 // Parámetros de URL para desarrollo:
 //   ?autostart              activa la cámara al cargar
-//   ?debug                  muestra los valores crudos de los gestos (para ajustar umbrales)
-//   ?demo=fist|open|pinch|two  manos simuladas, sin cámara
+//   ?debug                  muestra fps, calidad y los valores crudos de los gestos
+//   ?demo=fist|open|pinch|two|wave  manos simuladas, sin cámara
 
 import { createScene } from './scene/scene.js';
 import { ParticleSystem } from './scene/particles.js';
+import { QualityManager } from './scene/quality.js';
 import { HandTracker } from './tracking/handTracker.js';
 import { HandOverlay } from './tracking/handOverlay.js';
 import { GestureMapper } from './tracking/gestureMapper.js';
@@ -22,6 +23,7 @@ const camara = document.getElementById('camara');
 const video = document.getElementById('webcam');
 const manosCanvas = document.getElementById('manos');
 const estado = document.getElementById('estado');
+const fpsLabel = document.getElementById('fps');
 const ayuda = document.getElementById('ayuda');
 const btnIniciar = document.getElementById('btn-iniciar');
 
@@ -29,7 +31,9 @@ const urlParams = new URLSearchParams(location.search);
 const DEBUG = urlParams.has('debug');
 const demoHands = urlParams.has('demo') ? createDemoHands(urlParams.get('demo')) : null;
 
-const { scene, camera, controls, render, onResize } = createScene(canvas);
+const { scene, camera, controls, render, onResize, setPixelRatioCap, getPixelRatio, setBloomBoost } =
+  createScene(canvas);
+const quality = new QualityManager(setPixelRatioCap);
 
 // Menos partículas en pantallas pequeñas (móviles suelen tener GPU más modesta).
 const isSmallScreen = Math.min(window.innerWidth, window.innerHeight) < 700;
@@ -108,8 +112,20 @@ function updateStatus(params) {
   if (text !== lastStatus) estado.textContent = lastStatus = text;
 }
 
+// ?debug: fps y resolución de render, una vez por segundo.
+fpsLabel.hidden = !DEBUG;
+let lastFpsUpdate = 0;
+function updateFps(time) {
+  if (!DEBUG || time - lastFpsUpdate < 1000) return;
+  lastFpsUpdate = time;
+  fpsLabel.textContent = `${Math.round(quality.fps)} fps · resolución ${getPixelRatio()}x`;
+}
+
 let params = {};
 function loop(time) {
+  quality.tick(time);
+  updateFps(time);
+
   if (demoHands) {
     params = demoHands(time);
   } else if (tracker.running) {
@@ -126,7 +142,8 @@ function loop(time) {
   controls.autoRotate = !params.anyPresent;
 
   particles.update(time, params, camera);
-  render();
+  setBloomBoost(particles.getBloomBoost());
+  render(time);
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);

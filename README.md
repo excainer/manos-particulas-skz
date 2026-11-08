@@ -23,7 +23,7 @@ src/tracking/gestureMapper.js puntos → parámetros (posición, pellizco, apert
 2. Escena Three.js con partículas animadas (sin manos) ✅
 3. Webcam + MediaPipe, dibujar los puntos detectados ✅
 4. Mapear gestos a fuerzas sobre las partículas ✅
-5. Pulido visual (shaders, color, rendimiento)
+5. Pulido visual (shaders, color, rendimiento) ✅
 
 ## Gestos
 
@@ -31,11 +31,19 @@ src/tracking/gestureMapper.js puntos → parámetros (posición, pellizco, apert
 |---|---|
 | Puño | atrae las partículas cercanas y las hace girar en remolino |
 | Mano abierta | las repele, abriendo un hueco |
+| Puño → abierta | lanza una onda expansiva que recorre la galaxia |
 | Pellizco (pulgar + índice) | ilumina las partículas cercanas y acelera el giro de la galaxia |
 | Dos manos | separarlas agranda la galaxia, juntarlas la encoge |
 
 ## Parámetros de URL (desarrollo)
 
 - `?autostart`: activa la cámara al cargar
-- `?debug`: muestra los valores crudos de apertura y pellizco, para ajustar umbrales
-- `?demo=fist|open|pinch|two`: manos simuladas, sin cámara
+- `?debug`: muestra fps, resolución de render y los valores crudos de apertura y pellizco
+- `?demo=fist|open|pinch|two|wave`: manos simuladas, sin cámara
+
+## Rendimiento
+
+- Toda la animación se calcula en el vertex shader: por fotograma solo cambian unos pocos uniforms.
+- Calidad adaptativa (`src/scene/quality.js`): si los fps bajan de 45, reduce la resolución de render
+  por niveles; si se recuperan, la vuelve a subir (sin oscilar).
+- MediaPipe solo procesa fotogramas nuevos de la cámara (~30 fps), no cada fotograma de render.
