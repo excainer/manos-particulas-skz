@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manos y partículas</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <!-- Lienzo de Three.js (ocupa toda la pantalla) -->
+  <canvas id="escena"></canvas>
+
+  <!-- Vídeo de la webcam: oculto o en miniatura, sirve de entrada a MediaPipe -->
+  <video id="webcam" autoplay playsinline muted></video>
+
+  <!-- Panel de estado / depuración -->
+  <div id="hud">
+    <button id="btn-iniciar">Activar cámara</button>
+    <span id="estado">Esperando…</span>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

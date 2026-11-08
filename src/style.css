@@ -1,0 +1,46 @@
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #05060a;
+  color: #e6e8ef;
+  font-family: system-ui, sans-serif;
+}
+
+#escena {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Miniatura de la webcam en espejo, abajo a la derecha */
+#webcam {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: 200px;
+  transform: scaleX(-1);
+  border-radius: 8px;
+  opacity: 0.6;
+}
+
+#hud {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 14px;
+}
+
+#btn-iniciar {
+  padding: 8px 14px;
+  border: 1px solid #3a3f55;
+  border-radius: 6px;
+  background: #151826;
+  color: inherit;
+  cursor: pointer;
+}
