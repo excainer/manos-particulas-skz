@@ -2,9 +2,9 @@ html, body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  background: #05060a;
+  background: #02030a;
   color: #e6e8ef;
-  font-family: system-ui, sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 #escena {
@@ -13,34 +13,54 @@ html, body {
   width: 100%;
   height: 100%;
   display: block;
+  touch-action: none; /* el gesto táctil orbita la cámara en vez de hacer scroll */
+  cursor: grab;
 }
+#escena:active { cursor: grabbing; }
 
 /* Miniatura de la webcam en espejo, abajo a la derecha */
 #webcam {
   position: fixed;
   right: 16px;
   bottom: 16px;
-  width: 200px;
+  width: min(200px, 35vw);
   transform: scaleX(-1);
   border-radius: 8px;
   opacity: 0.6;
+  pointer-events: none;
 }
 
 #hud {
   position: fixed;
-  top: 16px;
+  top: max(16px, env(safe-area-inset-top));
   left: 16px;
+  right: 16px;
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   align-items: center;
-  font-size: 14px;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  pointer-events: none; /* no bloquear el arrastre del ratón… */
 }
+#hud > * { pointer-events: auto; } /* …salvo sobre sus elementos */
 
 #btn-iniciar {
-  padding: 8px 14px;
-  border: 1px solid #3a3f55;
-  border-radius: 6px;
-  background: #151826;
+  padding: 8px 16px;
+  border: 1px solid rgba(160, 180, 255, 0.25);
+  border-radius: 999px;
+  background: rgba(20, 24, 45, 0.55);
+  backdrop-filter: blur(8px);
   color: inherit;
+  font: inherit;
   cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+#btn-iniciar:hover {
+  background: rgba(40, 50, 90, 0.7);
+  border-color: rgba(160, 180, 255, 0.5);
+}
+
+#estado {
+  color: rgba(220, 226, 255, 0.6);
 }

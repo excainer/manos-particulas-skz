@@ -13,10 +13,17 @@ const video = document.getElementById('webcam');
 const estado = document.getElementById('estado');
 const btnIniciar = document.getElementById('btn-iniciar');
 
-const { renderer, scene, camera } = createScene(canvas);
-const particles = new ParticleSystem(scene);
+const { scene, render, onResize } = createScene(canvas);
+
+// Menos partículas en pantallas pequeñas (móviles suelen tener GPU más modesta).
+const isSmallScreen = Math.min(window.innerWidth, window.innerHeight) < 700;
+const particles = new ParticleSystem(scene, isSmallScreen ? 18000 : 45000);
+onResize((w, h, pr) => particles.setPixelRatio(pr));
+
 const tracker = new HandTracker(video);
 const mapper = new GestureMapper();
+
+estado.textContent = 'Arrastra para orbitar · rueda para acercar';
 
 // La cámara solo se pide tras un clic (los navegadores lo exigen para buena UX/permisos).
 btnIniciar.addEventListener('click', async () => {
@@ -28,7 +35,7 @@ function loop(time) {
   // TODO (paso 3): const hands = tracker.detect(time);
   // TODO (paso 4): const params = mapper.update(hands);
   particles.update(time /* , params */);
-  renderer.render(scene, camera);
+  render();
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
