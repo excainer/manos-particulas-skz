@@ -43,6 +43,11 @@ onResize((w, h, pr) => particles.setPixelRatio(pr));
 const tracker = new HandTracker(video);
 const overlay = new HandOverlay(manosCanvas, video);
 const mapper = new GestureMapper(camera, { target: controls.target });
+// Herramienta de calibración (?debug): se carga aparte y solo en ese modo; no afecta a la escena.
+let calibration = null;
+if (DEBUG) {
+  import('./dev/calibration.js').then((m) => (calibration = m.createCalibration({ tracker, video })));
+}
 
 const IDLE_TEXT = 'Arrastra para orbitar · rueda para acercar';
 estado.textContent = IDLE_TEXT;
@@ -137,6 +142,8 @@ function loop(time) {
     // Cámara detenida: seguir actualizando para que los efectos se apaguen suavemente.
     params = mapper.update([], time);
   }
+
+  calibration?.update(time);
 
   // Con una mano a la vista, la cámara deja de girar sola para que el control sea estable.
   controls.autoRotate = !params.anyPresent;
