@@ -18,16 +18,30 @@ html, body {
 }
 #escena:active { cursor: grabbing; }
 
-/* Miniatura de la webcam en espejo, abajo a la derecha */
-#webcam {
+/* Miniatura de la webcam en espejo, abajo a la derecha,
+   con el canvas del esqueleto superpuesto exactamente encima */
+#camara {
   position: fixed;
   right: 16px;
-  bottom: 16px;
-  width: min(200px, 35vw);
-  transform: scaleX(-1);
-  border-radius: 8px;
-  opacity: 0.6;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  width: min(240px, 38vw);
+  transform: scaleX(-1); /* espejo: mueves la mano derecha y se mueve a la derecha */
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(160, 180, 255, 0.2);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
   pointer-events: none;
+}
+#webcam {
+  display: block;
+  width: 100%;
+  opacity: 0.55;
+}
+#manos {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 #hud {
@@ -56,7 +70,11 @@ html, body {
   cursor: pointer;
   transition: background 0.2s, border-color 0.2s;
 }
-#btn-iniciar:hover {
+#btn-iniciar:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+#btn-iniciar:hover:not(:disabled) {
   background: rgba(40, 50, 90, 0.7);
   border-color: rgba(160, 180, 255, 0.5);
 }

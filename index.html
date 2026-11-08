@@ -10,8 +10,11 @@
   <!-- Lienzo de Three.js (ocupa toda la pantalla) -->
   <canvas id="escena"></canvas>
 
-  <!-- Vídeo de la webcam: oculto o en miniatura, sirve de entrada a MediaPipe -->
-  <video id="webcam" autoplay playsinline muted></video>
+  <!-- Webcam en miniatura (entrada de MediaPipe) con el esqueleto de las manos encima -->
+  <div id="camara" hidden>
+    <video id="webcam" autoplay playsinline muted></video>
+    <canvas id="manos"></canvas>
+  </div>
 
   <!-- Panel de estado / depuración -->
   <div id="hud">
