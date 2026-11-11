@@ -2,7 +2,7 @@
 
 Experimento: controlar un sistema de partículas 3D con las manos vía webcam.
 
-**[▶ Probar la demo](https://excainer.github.io/manos-particulas/)** — necesita webcam; todo se procesa en tu navegador, el vídeo no sale de tu equipo.
+**[▶ Probar la demo](https://excainer.github.io/manos-particulas-skz/)** — necesita webcam; todo se procesa en tu navegador, el vídeo no sale de tu equipo.
 
 - **Three.js**: renderizado 3D
 - **MediaPipe Hands** (`@mediapipe/tasks-vision`, HandLandmarker): detección de manos en el navegador
