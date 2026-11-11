@@ -2,6 +2,8 @@
 
 Experimento: controlar un sistema de partículas 3D con las manos vía webcam.
 
+**[▶ Probar la demo](https://excainer.github.io/manos-particulas/)** — necesita webcam; todo se procesa en tu navegador, el vídeo no sale de tu equipo.
+
 - **Three.js**: renderizado 3D
 - **MediaPipe Hands** (`@mediapipe/tasks-vision`, HandLandmarker): detección de manos en el navegador
 - **Vite**: servidor de desarrollo y empaquetado
@@ -34,6 +36,18 @@ src/tracking/gestureMapper.js puntos → parámetros (posición, pellizco, apert
 | Puño → abierta | lanza una onda expansiva que recorre la galaxia |
 | Pellizco (pulgar + índice) | ilumina las partículas cercanas y acelera el giro de la galaxia |
 | Dos manos | separarlas agranda la galaxia, juntarlas la encoge |
+| Corazón con las dos manos | la galaxia se reúne en un corazón 3D que late, con música y una frase |
+
+## Ejecutar en local
+
+```bash
+npm install
+npm run dev     # http://localhost:5173
+npm test        # pruebas (gestos y detector de corazón)
+```
+
+La canción de la secuencia del corazón no se incluye por derechos de autor: para escucharla, copia un mp3 a
+`public/audio/cancion.mp3`. Sin él, la secuencia funciona igual, sin música.
 
 ## Parámetros de URL (desarrollo)
 
