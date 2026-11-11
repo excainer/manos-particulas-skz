@@ -1,6 +1,6 @@
 // Música de la secuencia especial.
 //
-// El archivo NO forma parte del proyecto (está en .gitignore): cópialo a
+// Archivo:
 //   public/audio/cancion.mp3
 // Si no existe o el navegador no deja reproducirlo, la secuencia funciona igual,
 // sin música y con su duración por defecto.

@@ -46,8 +46,8 @@ npm run dev     # http://localhost:5173
 npm test        # pruebas (gestos y detector de corazón)
 ```
 
-La canción de la secuencia del corazón no se incluye por derechos de autor: para escucharla, copia un mp3 a
-`public/audio/cancion.mp3`. Sin él, la secuencia funciona igual, sin música.
+La música de la secuencia del corazón es *Hold My Hand* de HAN (Stray Kids), en `public/audio/cancion.mp3`.
+Todos los derechos pertenecen a sus autores; se incluye sin fines comerciales.
 
 ## Parámetros de URL (desarrollo)
 
